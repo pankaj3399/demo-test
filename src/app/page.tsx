@@ -12,6 +12,8 @@ type CountyMappings = {
   [key: string]: string[];
 };
 
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
 export default function DomainSelectionPage() {
   const [region, setRegion] = useState<Region | ''>('');
   const [division, setDivision] = useState('');
@@ -25,7 +27,7 @@ export default function DomainSelectionPage() {
   useEffect(() => {
     const loadUrls = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/urls');
+        const response = await fetch(`${backendUrl}/api/urls`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch URLs');
@@ -60,7 +62,7 @@ export default function DomainSelectionPage() {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/pdf/generate', {
+      const response = await fetch(`${backendUrl}/api/pdf/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

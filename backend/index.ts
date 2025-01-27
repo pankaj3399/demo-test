@@ -1,33 +1,91 @@
-const express = require('express');
-const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
-const OpenAI = require('openai');
-const XLSX = require('xlsx');
-const mammoth = require('mammoth');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs').promises;
+import * as express from 'express';
+import * as cors from 'cors';
+import { Request, Response } from 'express';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { OpenAI } from 'openai';
+import * as XLSX from 'xlsx';
+import { Sheet2JSONOpts } from 'xlsx';
+import * as mammoth from 'mammoth';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import { promises as fs } from 'fs';
+
+
+// Type definitions
+interface CompanyAddress {
+  street: string;
+  secondaryAddress: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+interface ExcelData {
+  divisionName: string;
+  countyName: string;
+  companyName: string;
+  companyType: string;
+  dbaName: string;
+  websiteAddress: string;
+  companyAddress: CompanyAddress;
+  bobVisitDateExcel: string;
+  earliestExpertScanDateExcel: string;
+}
+
+interface OpenAIResponse {
+  chatGptCompanyDescription: string;
+  chatGptParagraph22: string;
+  chatGptParagraph19: string;
+  nexusFacts40: string;
+  section33: string;
+}
+
+interface CombinedData extends ExcelData, OpenAIResponse {
+  emailSentDate: string;
+  date: string;
+  region: string;
+  division: string;
+  county: string;
+  section33Docs: string;
+  section35Docs: string;
+}
+
+interface GeneratePDFRequest extends Request {
+  body: {
+    url: string;
+    emailSentDate: string;
+    date: string;
+    region: string;
+    division: string;
+    county: string;
+    isRetest: boolean;
+  };
+}
+
+interface MammothOptions {
+  path: string;
+  styleMap: string[];
+}
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const corsOptions = {
-  origin: '*', 
+const corsOptions: cors.CorsOptions = {
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'], 
+  allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 app.use(cors(corsOptions));
-
 app.use(express.json());
 
-const extractDataFromExcel = (url, requestDivision, requestCounty) => {
+const extractDataFromExcel = (url: string, requestDivision: string, requestCounty: string): ExcelData => {
   const excelFilePath = path.resolve(__dirname, 'column_titles.xlsx');
   const workbook = XLSX.readFile(excelFilePath);
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  const data = XLSX.utils.sheet_to_json(worksheet);
+  const data = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
 
   const matchedRow = data.find((row) => row['URL'] && row['URL'].trim() === url.trim());
 
@@ -35,13 +93,12 @@ const extractDataFromExcel = (url, requestDivision, requestCounty) => {
     throw new Error(`No data found for URL: ${url}`);
   }
 
-  const excelSerialToDate = (serial) => {
+  const excelSerialToDate = (serial: number): string => {
     if (!serial) return '';
     const date = new Date((serial - 25569) * 86400 * 1000);
     const day = date.getDate();
-    const month = date.getMonth() + 1; // ]
+    const month = date.getMonth() + 1;
     const year = date.getFullYear();
-    // Return in DD/MM/YYYY format
     return `${day}/${month}/${year}`;
   };
 
@@ -64,7 +121,7 @@ const extractDataFromExcel = (url, requestDivision, requestCounty) => {
   };
 };
 
-const processOpenAIPrompts = async (url, companyName) => {
+const processOpenAIPrompts = async (url: string, companyName: string): Promise<OpenAIResponse> => {
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
   });
@@ -96,34 +153,29 @@ const processOpenAIPrompts = async (url, companyName) => {
   };
 };
 
-const readWordFile = async (filePath) => {
+const readWordFile = async (filePath: string): Promise<string> => {
   try {
-    // Use mammoth with options to preserve formatting
-    const result = await mammoth.extractRawText({
+    const options: MammothOptions = {
       path: filePath,
-      preserveNumbering: true,
       styleMap: [
         "p[style-name='Heading 1'] => h1:fresh",
         "p[style-name='Heading 2'] => h2:fresh",
         "p => p:fresh"
       ]
-    });
-    
-    // Split by newlines and preserve formatting
+    };
+
+    const result = await mammoth.extractRawText(options);
     const lines = result.value.split('\n');
     
-    // Process each line to maintain proper spacing and indentation
     const processedLines = lines.map(line => {
-      // Preserve leading spaces/tabs for indentation
-      const leadingSpaces = line.match(/^[\s\t]*/)[0];
+      const leadingSpaces = line.match(/^[\s\t]*/) || [''];
       const content = line.trim();
       if (content) {
-        return `${leadingSpaces}${content}`;
+        return `${leadingSpaces[0]}${content}`;
       }
       return '';
     });
     
-    // Join lines with proper spacing
     return processedLines.join('\n');
   } catch (error) {
     console.error('Error reading Word file:', error);
@@ -131,38 +183,32 @@ const readWordFile = async (filePath) => {
   }
 };
 
-const formatDate = (date) => {
+const formatDate = (date: string | Date | undefined): string => {
   if (!date) return '';
   
   try {
-    let d;
+    let d: Date | undefined;
+    
     if (typeof date === 'string') {
-      // First try parsing as Excel serial number
-      if (!isNaN(date) && !date.includes('/') && !date.includes('-')) {
+      if (!isNaN(Number(date)) && !date.includes('/') && !date.includes('-')) {
         d = new Date((Number(date) - 25569) * 86400 * 1000);
       } else {
-        // Try multiple date formats
         const formats = [
-          // Standard date string
-          str => new Date(str),
-          // DD/MM/YYYY
-          str => {
+          (str: string) => new Date(str),
+          (str: string) => {
             const [day, month, year] = str.split(/[/-]/);
-            return new Date(year, month - 1, day);
+            return new Date(Number(year), Number(month) - 1, Number(day));
           },
-          // MM/DD/YYYY
-          str => {
+          (str: string) => {
             const [month, day, year] = str.split(/[/-]/);
-            return new Date(year, month - 1, day);
+            return new Date(Number(year), Number(month) - 1, Number(day));
           },
-          // YYYY-MM-DD
-          str => {
+          (str: string) => {
             const [year, month, day] = str.split('-');
-            return new Date(year, month - 1, day);
+            return new Date(Number(year), Number(month) - 1, Number(day));
           }
         ];
 
-        // Try each format until we get a valid date
         for (const format of formats) {
           try {
             const tempDate = format(date);
@@ -170,7 +216,7 @@ const formatDate = (date) => {
               d = tempDate;
               break;
             }
-          } catch (e) {
+          } catch {
             continue;
           }
         }
@@ -196,22 +242,22 @@ const formatDate = (date) => {
   }
 };
 
-const generatePDFDocument = async (data, isRetest = false) => {
+const generatePDFDocument = async (data: CombinedData, isRetest = false): Promise<Uint8Array> => {
   const pdfDoc = await PDFDocument.create();
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const pageSize = { width: 612, height: 792 };
-  const leftMargin = 72;    // Adjusted left margin (1 inch)
-  const rightMargin = 72;   // Adjusted right margin (1 inch)
-  const topMargin = 72;     // Adjusted top margin (1 inch)
-  const bottomMargin = 72;  // Adjusted bottom margin (1 inch)
+  const leftMargin = 72;
+  const rightMargin = 72;
+  const topMargin = 72;
+  const bottomMargin = 72;
   
   const fontSize = 11;
   const headerSize = 13;
-  const lineHeight = 14;    // Reduced line height
-  const paragraphSpacing = 12; // Reduced paragraph spacing
-  const sectionSpacing = 20;  // Reduced section spacing
+  const lineHeight = 14;
+  const paragraphSpacing = 12;
+  const sectionSpacing = 20;
   const maxWidth = pageSize.width - (leftMargin + rightMargin);
 
   let currentPage = pdfDoc.addPage([pageSize.width, pageSize.height]);
@@ -223,7 +269,14 @@ const generatePDFDocument = async (data, isRetest = false) => {
     return currentPage;
   };
 
-  const drawText = (text, options = {}) => {
+  interface DrawTextOptions {
+    font?: typeof regularFont;
+    size?: number;
+    color?: ReturnType<typeof rgb>;
+    preserveFormatting?: boolean;
+  }
+
+  const drawText = (text: string, options: DrawTextOptions = {}) => {
     if (!text) return;
 
     const {
@@ -233,11 +286,10 @@ const generatePDFDocument = async (data, isRetest = false) => {
       preserveFormatting = false
     } = options;
 
-    // Handle word wrapping for lines that exceed the right margin
-    const wrapText = (textToWrap) => {
+    const wrapText = (textToWrap: string): string[] => {
       const words = textToWrap.split(' ');
       let currentLine = words[0];
-      const lines = [];
+      const lines: string[] = [];
 
       for (let i = 1; i < words.length; i++) {
         const testLine = `${currentLine} ${words[i]}`;
@@ -255,7 +307,6 @@ const generatePDFDocument = async (data, isRetest = false) => {
     };
 
     if (preserveFormatting) {
-      // Handle formatted text (like Word document content)
       const lines = text.split('\n');
       for (const line of lines) {
         if (yPosition - lineHeight < bottomMargin) {
@@ -263,7 +314,7 @@ const generatePDFDocument = async (data, isRetest = false) => {
         }
 
         if (line.trim()) {
-          const indentation = line.match(/^\s*/)[0].length * 5;
+          const indentation = (line.match(/^\s*/)?.[0] || '').length * 5;
           const wrappedLines = wrapText(line.trim());
           
           wrappedLines.forEach((wrappedLine) => {
@@ -277,11 +328,10 @@ const generatePDFDocument = async (data, isRetest = false) => {
             yPosition -= lineHeight;
           });
         } else {
-          yPosition -= lineHeight / 2; // Reduced spacing for empty lines
+          yPosition -= lineHeight / 2;
         }
       }
     } else {
-      // Handle regular text
       const wrappedLines = wrapText(text);
       wrappedLines.forEach((line) => {
         if (yPosition - lineHeight < bottomMargin) {
@@ -300,7 +350,6 @@ const generatePDFDocument = async (data, isRetest = false) => {
     }
   };
 
-  // Document Title
   drawText('Business Analysis Report', {
     size: headerSize + 2,
     font: boldFont,
@@ -308,8 +357,7 @@ const generatePDFDocument = async (data, isRetest = false) => {
   });
   yPosition -= sectionSpacing;
 
-  // Basic Information
-  const drawSection = (label, value) => {
+  const drawSection = (label: string, value: string) => {
     if (!value) return;
     drawText(`${label}: ${value}`, { font: regularFont });
     yPosition -= lineHeight / 2;
@@ -322,7 +370,6 @@ const generatePDFDocument = async (data, isRetest = false) => {
   drawSection('DBA Name', data.dbaName);
   drawSection('Website', data.websiteAddress);
 
-  // Address
   const address = [
     data.companyAddress.street,
     data.companyAddress.secondaryAddress,
@@ -330,14 +377,12 @@ const generatePDFDocument = async (data, isRetest = false) => {
   ].filter(Boolean).join(', ');
   drawSection('Address', address);
 
-  
   yPosition -= lineHeight / 2;
   drawSection('Email Sent', data.emailSentDate);
-  drawSection('Bob Visit Date', data.bobVisitDateExcel); // Use raw Excel date
-  drawSection('Expert Scan', data.earliestExpertScanDateExcel); // Use raw Excel date
+  drawSection('Bob Visit Date', data.bobVisitDateExcel);
+  drawSection('Expert Scan', data.earliestExpertScanDateExcel);
 
-  // Analysis Sections
-  const drawAnalysisSection = (title, content) => {
+  const drawAnalysisSection = (title: string, content: string) => {
     if (!content) return;
     yPosition -= sectionSpacing;
     drawText(title, {
@@ -346,7 +391,6 @@ const generatePDFDocument = async (data, isRetest = false) => {
     });
     yPosition -= lineHeight;
 
-    // Split content into paragraphs and handle each with proper spacing
     const paragraphs = content.split(/\n{2,}|\r\n{2,}/).map(p => p.trim()).filter(p => p);
     paragraphs.forEach((paragraph, index) => {
       drawText(paragraph);
@@ -362,7 +406,6 @@ const generatePDFDocument = async (data, isRetest = false) => {
   drawAnalysisSection('Accessibility Assessment', data.nexusFacts40);
   drawAnalysisSection('Physical Location Analysis', data.section33);
 
-  // Word Document Content
   addNewPage();
   const sectionTitle = isRetest ? 'Section 35' : 'Section 33';
   const sectionContent = isRetest ? data.section35Docs : data.section33Docs;
@@ -382,19 +425,18 @@ const generatePDFDocument = async (data, isRetest = false) => {
   return await pdfDoc.save();
 };
 
-app.get('/api/urls', (req, res) => {
+app.get('/api/urls', (_req: Request, res: Response) => {
   try {
     const filePath = path.join(__dirname, 'column_titles.xlsx');
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet, { 
-      raw: false,
-      cellDates: true 
-    });
+    const opts: Sheet2JSONOpts = { raw: false };
+    const data = XLSX.utils.sheet_to_json(worksheet, opts) as Record<string, any>[];
+    
     const urls = data
       .map(row => row['URL'])
-      .filter(URL => !!URL);
+      .filter((URL): URL is string => !!URL);
 
     res.json(urls);
   } catch (error) {
@@ -403,9 +445,7 @@ app.get('/api/urls', (req, res) => {
   }
 });
 
-
-
-app.post('/api/pdf/generate', async (req, res) => {
+app.post('/api/pdf/generate', async (req: GeneratePDFRequest, res: Response) => {
   try {
     const { url, emailSentDate, date, region, division, county, isRetest } = req.body;
 
@@ -418,9 +458,9 @@ app.post('/api/pdf/generate', async (req, res) => {
     
     const wordContent = await readWordFile(wordFilePath);
 
-    const combinedData = {
-      ...excelData,  // This will keep bobVisitDateExcel and earliestExpertScanDateExcel as is
-      emailSentDate: formatDate(emailSentDate), // Only format the manually entered dates
+    const combinedData: CombinedData = {
+      ...excelData,
+      emailSentDate: formatDate(emailSentDate),
       date: formatDate(date),
       region,
       division,
@@ -442,7 +482,6 @@ app.post('/api/pdf/generate', async (req, res) => {
     });
   }
 });
-
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

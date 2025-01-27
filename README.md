@@ -34,7 +34,7 @@ Both the frontend and backend require environment variables to function properly
 2. Add the required variables:
 
 ```env
-NEXT_PUBLIC_API_URL=https://your-backend.vercel.app
+NEXT_PUBLIC_BACKEND_URL=https://your-backend.vercel.app
 ```
 
 ### Backend (Express)
@@ -81,7 +81,13 @@ OPENAI_API_KEY=your_openai_api_key
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "index.ts"
+      "dest": "index.ts",
+      "headers": {
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+        "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version"
+      }
     }
   ]
 }
@@ -125,7 +131,7 @@ OPENAI_API_KEY=your_openai_api_key
 4. Configure environment variables:
    - Go to Settings > Environment Variables
    - Add all variables from your frontend `.env` file
-   - Update `NEXT_PUBLIC_API_URL` with your backend URL
+   - Update `NEXT_PUBLIC_BACKEND_URL` with your backend URL
 5. Deploy the project
 
 ---

@@ -27,7 +27,7 @@ export default function DomainSelectionPage() {
   useEffect(() => {
     const loadUrls = async () => {
       try {
-        const response = await fetch(`http://${backendUrl}/api/urls`);
+        const response = await fetch(`${backendUrl}/api/urls`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch URLs');
@@ -62,7 +62,7 @@ export default function DomainSelectionPage() {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`http://${backendUrl}/api/pdf/generate`, {
+      const response = await fetch(`${backendUrl}/api/pdf/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

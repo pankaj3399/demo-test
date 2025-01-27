@@ -34,7 +34,7 @@ Both the frontend and backend require environment variables to function properly
 2. Add the required variables:
 
 ```env
-NEXT_PUBLIC_API_URL=https://your-backend.vercel.app/api
+NEXT_PUBLIC_API_URL=https://your-backend.vercel.app
 ```
 
 ### Backend (Express)

@@ -1,9 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
+import { useState, useEffect } from "react";
 
-type Region = 'Eastern' | 'Western';
+type Region = "Eastern" | "Western";
 type DivisionOptions = {
   [key in Region]: string[];
 };
@@ -15,12 +14,12 @@ type CountyMappings = {
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export default function DomainSelectionPage() {
-  const [region, setRegion] = useState<Region | ''>('');
-  const [division, setDivision] = useState('');
-  const [county, setCounty] = useState('');
-  const [date, setDate] = useState('');
+  const [region, setRegion] = useState<Region | "">("");
+  const [division, setDivision] = useState("");
+  const [county, setCounty] = useState("");
+  const [date, setDate] = useState("");
   const [urls, setUrls] = useState<string[]>([]);
-  const [selectedUrl, setSelectedUrl] = useState('');
+  const [selectedUrl, setSelectedUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRetest, setIsRetest] = useState(false);
 
@@ -28,44 +27,92 @@ export default function DomainSelectionPage() {
     const loadUrls = async () => {
       try {
         const response = await fetch(`${backendUrl}/api/urls`);
-        
+
         if (!response.ok) {
-          throw new Error('Failed to fetch URLs');
+          throw new Error("Failed to fetch URLs");
         }
-  
+
         const urls = await response.json();
         setUrls(urls);
       } catch (error) {
-        console.error('Failed to load URLs:', error);
+        console.error("Failed to load URLs:", error);
       }
     };
-  
+
     loadUrls();
   }, []);
 
   const divisionOptions: DivisionOptions = {
-    'Eastern': [
-      'Eastern Division',
-      'Northern Division',
-      'Southeastern Division'
-    ],
-    'Western': ['Western Division']
+    Eastern: ["Eastern Division", "Northern Division", "Southeastern Division"],
+    Western: ["Western Division"],
   };
 
   const countyMappings: CountyMappings = {
-    "Eastern Division": ["Crawford", "Dent", "Franklin", "Gasconade", "Jefferson", "Lincoln", "Maries", "Phelps", "St. Charles", "St. Francois", "St. Louis City", "St. Louis County", "Warren", "Washington"],
-    "Northern Division": ["Adair", "Audrain", "Chariton", "Clark", "Knox", "Lewis", "Linn", "Macon", "Marion", "Monroe", "Montgomery", "Pike", "Ralls", "Randolph", "Schuyler", "Scotland", "Shelby"],
-    "Southeastern Division": ["Bollinger", "Butler", "Cape Girardeau", "Carter", "Dunklin", "Iron", "Madison", "Mississippi", "New Madrid", "Pemiscot", "Perry", "Reynolds", "Ripley", "Scott", "Shannon", "Ste. Genevieve", "Stoddard", "Wayne"],
-    'Western Division': ["St. Joseph"]
+    "Eastern Division": [
+      "Crawford",
+      "Dent",
+      "Franklin",
+      "Gasconade",
+      "Jefferson",
+      "Lincoln",
+      "Maries",
+      "Phelps",
+      "St. Charles",
+      "St. Francois",
+      "St. Louis City",
+      "St. Louis County",
+      "Warren",
+      "Washington",
+    ],
+    "Northern Division": [
+      "Adair",
+      "Audrain",
+      "Chariton",
+      "Clark",
+      "Knox",
+      "Lewis",
+      "Linn",
+      "Macon",
+      "Marion",
+      "Monroe",
+      "Montgomery",
+      "Pike",
+      "Ralls",
+      "Randolph",
+      "Schuyler",
+      "Scotland",
+      "Shelby",
+    ],
+    "Southeastern Division": [
+      "Bollinger",
+      "Butler",
+      "Cape Girardeau",
+      "Carter",
+      "Dunklin",
+      "Iron",
+      "Madison",
+      "Mississippi",
+      "New Madrid",
+      "Pemiscot",
+      "Perry",
+      "Reynolds",
+      "Ripley",
+      "Scott",
+      "Shannon",
+      "Ste. Genevieve",
+      "Stoddard",
+      "Wayne",
+    ],
+    "Western Division": ["St. Joseph"],
   };
 
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`${backendUrl}/api/pdf/generate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           url: selectedUrl,
@@ -76,26 +123,26 @@ export default function DomainSelectionPage() {
           emailSentDate: new Date().toISOString(),
           earliestExpertScanDate: new Date().toISOString(),
           date,
-          isRetest
-        })
+          isRetest,
+        }),
       });
 
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = 'generated_report.pdf';
+        a.download = "generated_report.pdf";
         a.click();
         window.URL.revokeObjectURL(url);
       } else {
         const errorData = await response.json();
-        console.error('PDF generation failed:', errorData);
-        alert(`Error: ${errorData.message || 'Failed to generate PDF'}`);
+        console.error("PDF generation failed:", errorData);
+        alert(`Error: ${errorData.message || "Failed to generate PDF"}`);
       }
     } catch (error) {
-      console.error('PDF generation failed', error);
-      alert('An error occurred while generating the PDF');
+      console.error("PDF generation failed", error);
+      alert("An error occurred while generating the PDF");
     } finally {
       setIsLoading(false);
     }
@@ -115,8 +162,8 @@ export default function DomainSelectionPage() {
             value={region}
             onChange={(e) => {
               setRegion(e.target.value as Region);
-              setDivision('');
-              setCounty('');
+              setDivision("");
+              setCounty("");
             }}
             className="w-full bg-gray-800 border border-gray-700 text-white p-2 rounded"
           >
@@ -144,10 +191,12 @@ export default function DomainSelectionPage() {
 
         <div>
           <label className="block text-gray-300 mb-2">Date</label>
-          <div 
+          <div
             className="relative w-full"
             onClick={() => {
-              const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
+              const dateInput = document.querySelector(
+                'input[type="date"]',
+              ) as HTMLInputElement;
               dateInput?.showPicker();
             }}
           >
@@ -168,13 +217,15 @@ export default function DomainSelectionPage() {
               value={division}
               onChange={(e) => {
                 setDivision(e.target.value);
-                setCounty('');
+                setCounty("");
               }}
               className="w-full bg-gray-800 border border-gray-700 text-white p-2 rounded"
             >
               <option value="">Select Division</option>
-              {divisionOptions[region].map(div => (
-                <option key={div} value={div}>{div}</option>
+              {divisionOptions[region].map((div) => (
+                <option key={div} value={div}>
+                  {div}
+                </option>
               ))}
             </select>
           </div>
@@ -189,8 +240,10 @@ export default function DomainSelectionPage() {
               className="w-full bg-gray-800 border border-gray-700 text-white p-2 rounded"
             >
               <option value="">Select County</option>
-              {countyMappings[division].map(countyName => (
-                <option key={countyName} value={countyName}>{countyName}</option>
+              {countyMappings[division].map((countyName) => (
+                <option key={countyName} value={countyName}>
+                  {countyName}
+                </option>
               ))}
             </select>
           </div>
@@ -204,15 +257,24 @@ export default function DomainSelectionPage() {
             onChange={(e) => setIsRetest(e.target.checked)}
             className="bg-gray-800 border border-gray-700 rounded"
           />
-          <label htmlFor="retest" className="text-gray-300">Is this a retest?</label>
+          <label htmlFor="retest" className="text-gray-300">
+            Is this a retest?
+          </label>
         </div>
 
         <button
           onClick={handleSubmit}
-          disabled={!region || !selectedUrl || !date || !division || !county || isLoading}
+          disabled={
+            !region ||
+            !selectedUrl ||
+            !date ||
+            !division ||
+            !county ||
+            isLoading
+          }
           className="w-full bg-gray-800 hover:bg-gray-700 text-white p-2 rounded disabled:opacity-50"
         >
-          {isLoading ? 'Generating...' : 'Generate Report'}
+          {isLoading ? "Generating..." : "Generate Report"}
         </button>
       </div>
     </div>

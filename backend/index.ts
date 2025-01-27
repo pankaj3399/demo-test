@@ -8,7 +8,6 @@ import { Sheet2JSONOpts } from "xlsx";
 import * as mammoth from "mammoth";
 import * as dotenv from "dotenv";
 import * as path from "path";
-import { promises as fs } from "fs";
 import { CorsOptions } from "cors";
 
 // Type definitions
@@ -481,11 +480,6 @@ app.get("/api/urls", (_req: Request, res: Response) => {
 app.post(
   "/api/pdf/generate",
   async (req: GeneratePDFRequest, res: Response) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.header("Access-Control-Allow-Credentials", "true");
-
     try {
       const { url, emailSentDate, date, region, division, county, isRetest } =
         req.body;

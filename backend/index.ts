@@ -449,6 +449,12 @@ app.get('/api/urls', (_req: Request, res: Response) => {
 });
 
 app.post('/api/pdf/generate', async (req: GeneratePDFRequest, res: Response) => {
+
+    res.header('Access-Control-Allow-Origin', 'https://demo-test-94vj.vercel.app');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
   try {
     const { url, emailSentDate, date, region, division, county, isRetest } = req.body;
 

@@ -13,7 +13,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const corsOptions = {
+  origin: 'https://demo-test-94vj.vercel.app', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'], 
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 
 const extractDataFromExcel = (url, requestDivision, requestCounty) => {

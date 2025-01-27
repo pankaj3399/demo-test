@@ -1,5 +1,5 @@
-import * as express from 'express';
-import * as cors from 'cors';
+const express = require('express');
+const cors = require('cors');
 import { Request, Response } from 'express';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { OpenAI } from 'openai';
@@ -9,6 +9,8 @@ import * as mammoth from 'mammoth';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import { CorsOptions } from 'cors';
+
 
 
 // Type definitions
@@ -72,7 +74,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const corsOptions: cors.CorsOptions = {
+const corsOptions: CorsOptions = {
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

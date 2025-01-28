@@ -9,8 +9,8 @@ import * as mammoth from "mammoth";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { CorsOptions } from "cors";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-// Type definitions
 interface CompanyAddress {
   street: string;
   secondaryAddress: string;
@@ -142,26 +142,54 @@ const processOpenAIPrompts = async (
     `Describe this business in detail but in only 2–3 brief but informative sentences. ${url}`,
     `Looking at that website, draft a paragraph explaining what the nexus is between the website and the principal address listed on the website using Defendant to describe "${companyName}" and Defendant's Website to refer to the website.`,
     `Take this paragraph and make it applicable to searching and utilizing the website using Defendant to refer to "${companyName}" and Defendant's Website to refer to the website: "The opportunity to shop and pre-shop Defendant's merchandise available for purchase in the Premises and sign up for an electronic emailer to receive offers, benefits, exclusive invitations, and discounts for use in the Premises from his home are important accommodations for MYERS because traveling outside of his home as a visually disabled individual is often difficult, hazardous, frightening, frustrating, and confusing experience. Defendant has not provided its business information in any other digital format that is accessible for use by blind and visually impaired individuals using the screen reader software."`,
-    `Using the information known, finish this paragraph but also include: "There is a physical nexus between Defendant's website and Defendant's Premises in that the website provides the contact information, operating hours, and access to products found at Defendant's Premises and address to Defendant's Premises. The website acts as the digital extension of the Principal Place of Business providing ...."`,
+    `Using the information known, finish this paragraph but also include everytime to the reponse: "There is a physical nexus between Defendant's website and Defendant's Premises in that the website provides the contact information, operating hours, and access to products found at Defendant's Premises and address to Defendant's Premises. The website acts as the digital extension of the Principal Place of Business providing ...."`,
   ];
 
-  const results = await Promise.all(
-    prompts.map(async (prompt) => {
+  const messages: ChatCompletionMessageParam[] = [{
+    role: "system",
+    content: `You are analyzing the website ${url} for ${companyName}. Maintain context between responses and refer back to previous information when relevant.`
+  }];
+
+  const results: string[] = [];
+
+  try {
+    for (const prompt of prompts) {
+      messages.push({ 
+        role: "user", 
+        content: prompt 
+      });
+      
       const completion = await openai.chat.completions.create({
         model: "gpt-4",
-        messages: [{ role: "user", content: prompt }],
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 500,
       });
-      return completion.choices[0]?.message?.content || "";
-    }),
-  );
 
-  return {
-    chatGptCompanyDescription: results[0],
-    chatGptParagraph22: results[1],
-    chatGptParagraph19: results[2],
-    nexusFacts40: results[3],
-    section33: results[4],
-  };
+      const response = completion.choices[0]?.message?.content || "";
+      results.push(response);
+      
+      messages.push({ 
+        role: "assistant", 
+        content: response 
+      });
+    }
+
+    return {
+      chatGptCompanyDescription: results[0],
+      chatGptParagraph22: results[1],
+      chatGptParagraph19: results[2],
+      nexusFacts40: results[3],
+      section33: results[4],
+    };
+  } catch (error) {
+    console.error('OpenAI API Error:', error);
+    throw new Error(
+      error instanceof Error 
+        ? `Failed to process OpenAI prompts: ${error.message}`
+        : 'Failed to process OpenAI prompts'
+    );
+  }
 };
 
 const readWordFile = async (filePath: string): Promise<string> => {
@@ -429,11 +457,11 @@ const generatePDFDocument = async (
     });
   };
 
-  drawAnalysisSection("Company Description", data.chatGptCompanyDescription);
-  drawAnalysisSection("Business Summary", data.chatGptParagraph22);
-  drawAnalysisSection("Website Analysis", data.chatGptParagraph19);
-  drawAnalysisSection("Accessibility Assessment", data.nexusFacts40);
-  drawAnalysisSection("Physical Location Analysis", data.section33);
+  // drawAnalysisSection("Company Description", data.chatGptCompanyDescription);
+  drawAnalysisSection("Business Summary ( ChatGPTCompanyDescription )", data.chatGptParagraph22);
+  drawAnalysisSection("Website Analysis ( ChatGPT_Paragraph_19 ) ", data.chatGptParagraph19);
+  drawAnalysisSection("Accessibility Assessment ( ChatGPT_Paragraph_22 )", data.nexusFacts40);
+  drawAnalysisSection("Physical Location Analysis ( NexusFacts40 )", data.section33);
 
   addNewPage();
   const sectionTitle = isRetest ? "Section 35" : "Section 33";

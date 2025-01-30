@@ -8,7 +8,6 @@ import { Sheet2JSONOpts } from "xlsx";
 import * as mammoth from "mammoth";
 import * as dotenv from "dotenv";
 import * as path from "path";
-import { CorsOptions } from "cors";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 interface CompanyAddress {
@@ -29,6 +28,7 @@ interface ExcelData {
   companyAddress: CompanyAddress;
   bobVisitDateExcel: string;
   earliestExpertScanDateExcel: string;
+  retestExpertScanDateExcel: string;
 }
 
 interface OpenAIResponse {
@@ -71,14 +71,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const corsOptions: CorsOptions = {
-  origin: ["*"],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-};
-
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
 const extractDataFromExcel = (
@@ -126,6 +119,9 @@ const extractDataFromExcel = (
     earliestExpertScanDateExcel: excelSerialToDate(
       matchedRow["earliest_Expert_scan_date"] || "",
     ),
+    retestExpertScanDateExcel: excelSerialToDate(
+      matchedRow["retest_expert_scan_date"] || "",
+    ),
   };
 };
 
@@ -145,20 +141,22 @@ const processOpenAIPrompts = async (
     `Using the information known, finish this paragraph but also include everytime to the reponse: "There is a physical nexus between Defendant's website and Defendant's Premises in that the website provides the contact information, operating hours, and access to products found at Defendant's Premises and address to Defendant's Premises. The website acts as the digital extension of the Principal Place of Business providing ...."`,
   ];
 
-  const messages: ChatCompletionMessageParam[] = [{
-    role: "system",
-    content: `You are analyzing the website ${url} for ${companyName}. Maintain context between responses and refer back to previous information when relevant.`
-  }];
+  const messages: ChatCompletionMessageParam[] = [
+    {
+      role: "system",
+      content: `You are analyzing the website ${url} for ${companyName}. Maintain context between responses and refer back to previous information when relevant.`,
+    },
+  ];
 
   const results: string[] = [];
 
   try {
     for (const prompt of prompts) {
-      messages.push({ 
-        role: "user", 
-        content: prompt 
+      messages.push({
+        role: "user",
+        content: prompt,
       });
-      
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4",
         messages: messages,
@@ -168,10 +166,10 @@ const processOpenAIPrompts = async (
 
       const response = completion.choices[0]?.message?.content || "";
       results.push(response);
-      
-      messages.push({ 
-        role: "assistant", 
-        content: response 
+
+      messages.push({
+        role: "assistant",
+        content: response,
       });
     }
 
@@ -183,11 +181,11 @@ const processOpenAIPrompts = async (
       section33: results[4],
     };
   } catch (error) {
-    console.error('OpenAI API Error:', error);
+    console.error("OpenAI API Error:", error);
     throw new Error(
-      error instanceof Error 
+      error instanceof Error
         ? `Failed to process OpenAI prompts: ${error.message}`
-        : 'Failed to process OpenAI prompts'
+        : "Failed to process OpenAI prompts",
     );
   }
 };
@@ -415,12 +413,12 @@ const generatePDFDocument = async (
     yPosition -= lineHeight / 2;
   };
 
-  drawSection("Division", data.divisionName);
-  drawSection("County", data.countyName);
-  drawSection("Company Name", data.companyName);
-  drawSection("Type of Company", data.companyType);
-  drawSection("DBA Name", data.dbaName);
-  drawSection("Website", data.websiteAddress);
+  drawSection("Division (Division Name)", data.divisionName);
+  drawSection("County (County Name)", data.countyName);
+  drawSection("Company Name (Company Name)", data.companyName);
+  drawSection("Type of Company (Type of Company)", data.companyType);
+  drawSection("DBA Name (DBA Name)", data.dbaName);
+  drawSection("Website (URL)", data.websiteAddress);
 
   const address = [
     data.companyAddress.street,
@@ -429,12 +427,26 @@ const generatePDFDocument = async (
   ]
     .filter(Boolean)
     .join(", ");
-  drawSection("Address", address);
+  drawSection("Address (Company Address)", address);
 
   yPosition -= lineHeight / 2;
-  drawSection("Email Sent", data.emailSentDate);
-  drawSection("Bob Visit Date", data.bobVisitDateExcel);
-  drawSection("Expert Scan", data.earliestExpertScanDateExcel);
+  drawSection("Date (Datepicker)", data.date);
+  drawSection("Email Sent (Email Sent Date)", data.emailSentDate);
+  drawSection(
+    "Bob Visit Date (Bob Visit Date)",
+    formatDate(data.bobVisitDateExcel),
+  );
+  drawSection(
+    "Expert Scan (Earliest Expert Scan Date)",
+    formatDate(data.earliestExpertScanDateExcel),
+  );
+
+  if (isRetest) {
+    drawSection(
+      "Retest Expert Scan (Retest Expert Scan Date)",
+      formatDate(data.retestExpertScanDateExcel),
+    );
+  }
 
   const drawAnalysisSection = (title: string, content: string) => {
     if (!content) return;
@@ -458,10 +470,22 @@ const generatePDFDocument = async (
   };
 
   // drawAnalysisSection("Company Description", data.chatGptCompanyDescription);
-  drawAnalysisSection("Business Summary ( ChatGPTCompanyDescription )", data.chatGptParagraph22);
-  drawAnalysisSection("Website Analysis ( ChatGPT_Paragraph_19 ) ", data.chatGptParagraph19);
-  drawAnalysisSection("Accessibility Assessment ( ChatGPT_Paragraph_22 )", data.nexusFacts40);
-  drawAnalysisSection("Physical Location Analysis ( NexusFacts40 )", data.section33);
+  drawAnalysisSection(
+    "Business Summary ( ChatGPTCompanyDescription )",
+    data.chatGptParagraph22,
+  );
+  drawAnalysisSection(
+    "Website Analysis ( ChatGPT_Paragraph_19 ) ",
+    data.chatGptParagraph19,
+  );
+  drawAnalysisSection(
+    "Accessibility Assessment ( ChatGPT_Paragraph_22 )",
+    data.nexusFacts40,
+  );
+  drawAnalysisSection(
+    "Physical Location Analysis ( NexusFacts40 )",
+    data.section33,
+  );
 
   addNewPage();
   const sectionTitle = isRetest ? "Section 35" : "Section 33";

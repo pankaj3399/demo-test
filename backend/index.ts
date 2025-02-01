@@ -413,12 +413,12 @@ const generatePDFDocument = async (
     yPosition -= lineHeight / 2;
   };
 
-  drawSection("Division (Division Name)", data.divisionName);
-  drawSection("County (County Name)", data.countyName);
-  drawSection("Company Name (Company Name)", data.companyName);
-  drawSection("Type of Company (Type of Company)", data.companyType);
-  drawSection("DBA Name (DBA Name)", data.dbaName);
-  drawSection("Website (URL)", data.websiteAddress);
+  drawSection("(Division Name)", data.divisionName);
+  drawSection("(County Name)", data.countyName);
+  drawSection("(Company Name)", data.companyName);
+  drawSection("(Type of Company)", data.companyType);
+  drawSection("(DBA Name)", data.dbaName);
+  drawSection("(URL)", data.websiteAddress);
 
   const address = [
     data.companyAddress.street,
@@ -427,23 +427,20 @@ const generatePDFDocument = async (
   ]
     .filter(Boolean)
     .join(", ");
-  drawSection("Address (Company Address)", address);
+  drawSection("(Company Address)", address);
 
   yPosition -= lineHeight / 2;
-  drawSection("Date (Datepicker)", data.date);
-  drawSection("Email Sent (Email Sent Date)", data.emailSentDate);
+  drawSection("(Datepicker)", data.date);
+  drawSection("(Email Sent Date)", data.emailSentDate);
+  drawSection("(Bob Visit Date)", formatDate(data.bobVisitDateExcel));
   drawSection(
-    "Bob Visit Date (Bob Visit Date)",
-    formatDate(data.bobVisitDateExcel),
-  );
-  drawSection(
-    "Expert Scan (Earliest Expert Scan Date)",
+    "(Earliest Expert Scan Date)",
     formatDate(data.earliestExpertScanDateExcel),
   );
 
   if (isRetest) {
     drawSection(
-      "Retest Expert Scan (Retest Expert Scan Date)",
+      "(Retest Expert Scan Date)",
       formatDate(data.retestExpertScanDateExcel),
     );
   }
@@ -470,26 +467,14 @@ const generatePDFDocument = async (
   };
 
   // drawAnalysisSection("Company Description", data.chatGptCompanyDescription);
-  drawAnalysisSection(
-    "Business Summary ( ChatGPTCompanyDescription )",
-    data.chatGptParagraph22,
-  );
-  drawAnalysisSection(
-    "Website Analysis ( ChatGPT_Paragraph_19 ) ",
-    data.chatGptParagraph19,
-  );
-  drawAnalysisSection(
-    "Accessibility Assessment ( ChatGPT_Paragraph_22 )",
-    data.nexusFacts40,
-  );
-  drawAnalysisSection(
-    "Physical Location Analysis ( NexusFacts40 )",
-    data.section33,
-  );
+  drawAnalysisSection("( ChatGPTCompanyDescription )", data.chatGptParagraph22);
+  drawAnalysisSection("( ChatGPT_Paragraph_19 ) ", data.chatGptParagraph19);
+  drawAnalysisSection("( ChatGPT_Paragraph_22 )", data.nexusFacts40);
+  drawAnalysisSection("( NexusFacts40 )", data.section33);
 
   addNewPage();
-  const sectionTitle = isRetest ? "Section 35" : "Section 33";
-  const sectionContent = isRetest ? data.section35Docs : data.section33Docs;
+  const sectionTitle = "Section 33";
+  const sectionContent = data.section35Docs;
 
   if (sectionContent) {
     drawText(sectionTitle, {
@@ -501,6 +486,21 @@ const generatePDFDocument = async (
     drawText(sectionContent, {
       preserveFormatting: true,
     });
+  }
+  if (isRetest) {
+    const sectionTitle = "Section 35";
+    const sectionContent = data.section35Docs;
+    if (sectionContent) {
+      drawText(sectionTitle, {
+        font: boldFont,
+        size: headerSize,
+      });
+      yPosition -= lineHeight * 2;
+
+      drawText(sectionContent, {
+        preserveFormatting: true,
+      });
+    }
   }
 
   return await pdfDoc.save();
